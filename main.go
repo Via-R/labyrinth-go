@@ -1,7 +1,14 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	core "github.com/Via-R/labyrinth-go/core"
+)
 
 func main() {
-	fmt.Println("I'm ready for whatever will happen here")
+	fmt.Println("Labyrinth sandbox")
+	l := core.Field{}
+	l.SetSize(8, 8)
+	l.SetStartAndFinish(core.Coordinates{X: 0, Y: 3}, core.Coordinates{X: 7, Y: 5})
+	fmt.Println(l)
 }
