@@ -71,8 +71,8 @@ func (Field) Error(s string) error {
 func (f *Field) findChoices(coords Coordinates) ([]Coordinates, error) {
 	shifts := [4][2]int{{-1, 0}, {0, 1}, {1, 0}, {0, -1}}
 	choices := make([]Coordinates, 0, 4)
-	for i := range shifts {
-		choice := Coordinates{coords.X + shifts[i][0], coords.Y + shifts[i][1]}
+	for _, shift := range shifts {
+		choice := Coordinates{coords.X + shift[0], coords.Y + shift[1]}
 		if cell, err := f.at(choice); err != nil {
 			continue
 		} else if !cell.IsBlocking() {
@@ -123,8 +123,8 @@ func (f *Field) selectChoice(choices []Coordinates, complexity float64) (Coordin
 	choice_cursor := rand.Float64()
 	fmt.Printf("Choice cursor: %v\n", choice_cursor)
 	choice_idx := -1
-	for i := range probability_limits {
-		if choice_cursor < probability_limits[i] {
+	for i, limit := range probability_limits {
+		if choice_cursor < limit {
 			choice_idx = i
 			break
 		}

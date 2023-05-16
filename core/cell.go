@@ -37,8 +37,8 @@ func (c Cell) IsBlocking() bool {
 // Create a string representation of a labyrinth row
 func cellsArrayToString(cells []Cell, delimeter string) string {
 	row_string := ""
-	for i := range cells {
-		row_string += " " + cells[i].String()
+	for _, cell := range cells {
+		row_string += " " + cell.String()
 	}
 	return row_string
 }
