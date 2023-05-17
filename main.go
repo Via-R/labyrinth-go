@@ -10,9 +10,9 @@ func main() {
 	l := core.Field{}
 	l.SetSize(8, 8)
 	l.SetStartAndFinish(core.Coordinates{X: 0, Y: 4}, core.Coordinates{X: 7, Y: 2})
-	fmt.Println(l)
-	err := l.GenerateSolution(1)
+	err := l.GenerateSolution(0)
 	if err != nil {
 		fmt.Println(err)
 	}
+	fmt.Println(l)
 }

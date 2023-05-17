@@ -6,9 +6,9 @@ import (
 	"math/rand"
 )
 
-// Container for Labyrinth and additional characteristics
+// Container for labyrinth and additional characteristics
 type Field struct {
-	Labyrinth     [][]Cell
+	labyrinth     [][]Cell
 	Width, Length uint
 	Start, Finish Coordinates
 	Solution      Route
@@ -17,9 +17,9 @@ type Field struct {
 // Change the size of labyrinth
 // Clears up all cells
 func (f *Field) SetSize(width, length uint) {
-	f.Labyrinth = make([][]Cell, length)
-	for i := range f.Labyrinth {
-		f.Labyrinth[i] = make([]Cell, width)
+	f.labyrinth = make([][]Cell, length)
+	for i := range f.labyrinth {
+		f.labyrinth[i] = make([]Cell, width)
 	}
 	f.Width, f.Length = width, length
 	f.MakeEmpty()
@@ -27,9 +27,9 @@ func (f *Field) SetSize(width, length uint) {
 
 // Clear up all cells
 func (f *Field) MakeEmpty() {
-	for i := range f.Labyrinth {
-		for j := range f.Labyrinth[i] {
-			f.Labyrinth[i][j] = Empty
+	for i := range f.labyrinth {
+		for j := range f.labyrinth[i] {
+			f.labyrinth[i][j] = Empty
 		}
 	}
 	f.Start, f.Finish = Coordinates{-1, -1}, Coordinates{-1, -1}
@@ -41,13 +41,25 @@ func (f *Field) at(c Coordinates) (Cell, error) {
 		return Empty, f.Error(fmt.Sprintf("Cannot get cell %v out of field's bounds w=%v l=%v", c, f.Width, f.Length))
 	}
 
-	return f.Labyrinth[c.Y][c.X], nil
+	return f.labyrinth[c.Y][c.X], nil
+}
+
+// Change cell type at the chosen coordinates
+func (f *Field) set(cell Cell, c Coordinates) error {
+	if !c.IsValid(f.Width-1, f.Length-1) {
+		return f.Error(fmt.Sprintf("Cannot set cell %v out of field's bounds w=%v l=%v", c, f.Width, f.Length))
+	}
+	if old_cell, _ := f.at(c); old_cell != Start && old_cell != Finish {
+		f.labyrinth[c.Y][c.X] = cell
+	}
+
+	return nil
 }
 
 // Set start and finish points
 func (f *Field) SetStartAndFinish(start, finish Coordinates) {
-	f.Labyrinth[start.Y][start.X] = Start
-	f.Labyrinth[finish.Y][finish.X] = Finish
+	f.labyrinth[start.Y][start.X] = Start
+	f.labyrinth[finish.Y][finish.X] = Finish
 	f.Start, f.Finish = start, finish
 }
 
@@ -55,8 +67,8 @@ func (f *Field) SetStartAndFinish(start, finish Coordinates) {
 func (f Field) String() string {
 	field_string := "\n"
 
-	for i := len(f.Labyrinth) - 1; i >= 0; i-- {
-		field_string += cellsArrayToString(f.Labyrinth[i], " ") + "\n"
+	for i := len(f.labyrinth) - 1; i >= 0; i-- {
+		field_string += cellsArrayToString(f.labyrinth[i], " ") + "\n"
 	}
 
 	return field_string
@@ -64,7 +76,7 @@ func (f Field) String() string {
 
 // Formatted error for usage in Field
 func (Field) Error(s string) error {
-	return fmt.Errorf("Labyrinth error: %v", s)
+	return fmt.Errorf("labyrinth error: %v", s)
 }
 
 // Find all possible choices from goven coordinates
@@ -96,11 +108,16 @@ func (f *Field) selectChoice(choices []Coordinates, complexity float64) (Coordin
 	case 1:
 		return choices[0], nil
 	}
+	for _, choice := range choices {
+		if choice == f.Finish {
+			return choice, nil
+		}
+	}
 
 	distances, probabilities, probability_limits := make([]float64, len(choices)), make([]float64, len(choices)), make([]float64, len(choices))
 	sum := 0.
 	reverse_distances := rand.Float64() < complexity
-	fmt.Printf("Reverse distances: %v\n", reverse_distances)
+	// fmt.Printf("Reverse distances: %v\n", reverse_distances)
 	for i := range choices {
 		distances[i] = 1 / choices[i].Distance(f.Finish)
 		if reverse_distances {
@@ -108,20 +125,20 @@ func (f *Field) selectChoice(choices []Coordinates, complexity float64) (Coordin
 		}
 		sum += distances[i]
 	}
-	fmt.Printf("Distances: %v\n", distances)
+	// fmt.Printf("Distances: %v\n", distances)
 
 	for i := range distances {
 		probabilities[i] = distances[i] / sum
 	}
-	fmt.Printf("Probabilities: %v\n", probabilities)
+	// fmt.Printf("Probabilities: %v\n", probabilities)
 	sum = 0
 	for i := range probabilities {
 		probability_limits[i] = sum + probabilities[i]
 		sum += probabilities[i]
 	}
-	fmt.Printf("Probability limits: %v\n", probability_limits)
+	// fmt.Printf("Probability limits: %v\n", probability_limits)
 	choice_cursor := rand.Float64()
-	fmt.Printf("Choice cursor: %v\n", choice_cursor)
+	// fmt.Printf("Choice cursor: %v\n", choice_cursor)
 	choice_idx := -1
 	for i, limit := range probability_limits {
 		if choice_cursor < limit {
@@ -129,9 +146,26 @@ func (f *Field) selectChoice(choices []Coordinates, complexity float64) (Coordin
 			break
 		}
 	}
-	fmt.Printf("Choice idx: %v\n", choice_idx)
+	// fmt.Printf("Choice idx: %v\n", choice_idx)
 
 	return choices[choice_idx], nil
+}
+
+// Surround selected cell with walls, except for the neighboring cells to except_coords
+func (f *Field) surroundWithWalls(coords Coordinates, except_coords Coordinates) {
+	shifts := [8][2]int{{0, 1}, {1, 1}, {1, 0}, {1, -1}, {0, -1}, {-1, -1}, {-1, 0}, {-1, 1}}
+
+	for _, shift := range shifts {
+		choice := Coordinates{coords.X + shift[0], coords.Y + shift[1]}
+		// fmt.Printf("Trying to set a wall at%v: ", choice)
+		if cell, err := f.at(choice); err != nil || cell != Empty || except_coords.Distance(choice) <= 1 {
+			// fmt.Printf("Fail - err=%v, cell=%v, dist=%v\n", err, cell, except_coords.Distance(choice))
+			continue
+		} else {
+			// fmt.Print("Success\n")
+			f.set(Wall, choice)
+		}
+	}
 }
 
 // Generate solution based on complexity (in percents)
@@ -142,20 +176,35 @@ func (f *Field) GenerateSolution(complexity float64) error {
 		return f.Error("Start and/or finish are out of bounds or not set yet")
 	}
 
-	route := Route{Coords: f.Start}
-	route_head := &route
-	choices, err := f.findChoices(route.Coords)
+	route_tail := Route{Coords: f.Start}
+	route_head := &route_tail
+
 	counter := 0
 
-	for len(choices) > 0 && route_head.Coords != f.Finish && counter < 1 {
+	for route_head.Coords != f.Finish && counter < 40 {
+		choices, err := f.findChoices(route_head.Coords)
 		if err != nil {
 			return err
 		}
 
-		fmt.Println(choices)
-		f.selectChoice(choices, complexity)
+		if len(choices) == 0 {
+			return f.Error("Could not reach the finish")
+		}
+
+		next_coords, err := f.selectChoice(choices, complexity)
+		if err = f.set(Path, next_coords); err != nil {
+			return err
+		}
+
+		f.surroundWithWalls(route_head.Coords, next_coords)
+
+		new_path_part := Route{Coords: next_coords, Prev: route_head}
+		route_head.Next = &new_path_part
+		route_head = &new_path_part
+
 		counter++
 	}
+	f.surroundWithWalls(f.Finish, Coordinates{-1, -1})
 
 	return nil
 }

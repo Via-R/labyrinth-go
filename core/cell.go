@@ -31,7 +31,7 @@ func (c Cell) String() string {
 }
 
 func (c Cell) IsBlocking() bool {
-	return c == Wall || c == Path
+	return c == Wall || c == Path || c == Start
 }
 
 // Create a string representation of a labyrinth row
