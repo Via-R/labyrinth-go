@@ -10,7 +10,7 @@ func main() {
 	l := core.Field{}
 	l.SetSize(8, 8)
 	l.SetStartAndFinish(core.Coordinates{X: 0, Y: 4}, core.Coordinates{X: 7, Y: 2})
-	err := l.GenerateSolution(0)
+	err := l.GenerateLabyrinth(0)
 	if err != nil {
 		fmt.Println(err)
 	}
