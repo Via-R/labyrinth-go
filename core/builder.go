@@ -5,6 +5,7 @@ import (
 	"math/rand"
 )
 
+// Arrays of all possible coordinates' shifts when going around Von Neumann's and Moore's neighborhoods
 var NeumannShifts = [4][2]int{{-1, 0}, {0, 1}, {1, 0}, {0, -1}}
 var MooreShifts = [8][2]int{{0, 1}, {1, 1}, {1, 0}, {1, -1}, {0, -1}, {-1, -1}, {-1, 0}, {-1, 1}}
 
@@ -46,7 +47,7 @@ func (f *Field) isChoiceValid(coords Coordinates) bool {
 	return true
 }
 
-// Find all possible choices from goven coordinates
+// Find all possible choices from given coordinates
 func (f *Field) findChoices(coords Coordinates) ([]Coordinates, error) {
 	choices := make([]Coordinates, 0, 4)
 	for _, shift := range NeumannShifts {
@@ -72,6 +73,7 @@ func (f *Field) selectChoice(choices []Coordinates, complexity float64) (Coordin
 	case 1:
 		return choices[0], nil
 	}
+
 	for _, choice := range choices {
 		if choice == f.Finish {
 			return choice, nil
@@ -81,7 +83,6 @@ func (f *Field) selectChoice(choices []Coordinates, complexity float64) (Coordin
 	distances, probabilities, probability_limits := make([]float64, len(choices)), make([]float64, len(choices)), make([]float64, len(choices))
 	sum := 0.
 	reverse_distances := rand.Float64() < complexity
-	// fmt.Printf("Reverse distances: %v\n", reverse_distances)
 	for i := range choices {
 		distances[i] = 1 / choices[i].Distance(f.Finish)
 		if reverse_distances {
@@ -89,20 +90,18 @@ func (f *Field) selectChoice(choices []Coordinates, complexity float64) (Coordin
 		}
 		sum += distances[i]
 	}
-	// fmt.Printf("Distances: %v\n", distances)
 
 	for i := range distances {
 		probabilities[i] = distances[i] / sum
 	}
-	// fmt.Printf("Probabilities: %v\n", probabilities)
+
 	sum = 0
 	for i := range probabilities {
 		probability_limits[i] = sum + probabilities[i]
 		sum += probabilities[i]
 	}
-	// fmt.Printf("Probability limits: %v\n", probability_limits)
+
 	choice_cursor := rand.Float64()
-	// fmt.Printf("Choice cursor: %v\n", choice_cursor)
 	choice_idx := -1
 	for i, limit := range probability_limits {
 		if choice_cursor < limit {
@@ -115,112 +114,79 @@ func (f *Field) selectChoice(choices []Coordinates, complexity float64) (Coordin
 	return choices[choice_idx], nil
 }
 
-// Surround selected cell with walls, except for the neighboring cells to except_coords
-func (f *Field) surroundWithWalls(coords Coordinates, except_coords Coordinates) {
-	for _, shift := range MooreShifts {
-		choice := Coordinates{coords.X + shift[0], coords.Y + shift[1]}
-		// fmt.Printf("Trying to set a wall at%v: ", choice)
-		if cell, err := f.at(choice); err != nil || cell != Empty || except_coords.Distance(choice) <= 1 {
-			// fmt.Printf("Fail - err=%v, cell=%v, dist=%v\n", err, cell, except_coords.Distance(choice))
-			continue
-		} else {
-			// fmt.Print("Success\n")
-			f.set(Wall, choice)
-		}
-	}
-}
-
-func (f *Field) reachFinishOrLoop(route_tail Route) (Route, uint, bool, error) {
-	route_head := &route_tail
-	route_length := uint(1)
-
+// Continue the given route until it gets stuck or reaches the finish
+func (f *Field) reachFinishOrLoop(route Route, complexity float64) (Route, error) {
 	safety_counter := 0
 	const safety_limit = 100
 
-	for route_head.Coords != f.Finish && safety_counter < safety_limit {
-		choices, err := f.findChoices(route_head.Coords)
+	for route.End.Coords != f.Finish && safety_counter < safety_limit {
+		choices, err := f.findChoices(route.End.Coords)
 		if err != nil {
-			return Route{}, 0, true, err
+			return Route{}, err
 		}
 
 		if len(choices) == 0 {
-			return route_tail, route_length, false, f.Error("Could not reach the finish")
+			return route, nil
 		}
 
-		next_coords, err := f.selectChoice(choices, 0)
+		next_coords, err := f.selectChoice(choices, complexity)
 		if err = f.set(Path, next_coords); err != nil {
-			return Route{}, 0, true, err
+			return Route{}, err
 		}
 
-		new_path_part := Route{Coords: next_coords, Prev: route_head}
-		route_head.Next = &new_path_part
-		route_head = &new_path_part
-		route_length++
-
+		route.Add(next_coords)
 		safety_counter++
 	}
 
 	if safety_counter == safety_limit {
-		return Route{}, 0, true, f.Error("Safety limit exceeded in route builder")
+		return Route{}, f.Error("Safety limit exceeded in route builder")
 	}
 
-	return route_tail, route_length, false, nil
-}
-
-type RouteWithLength struct {
-	r Route
-	l uint
+	return route, nil
 }
 
 // Generate labyrinth based on complexity (in percents)
 func (f *Field) GenerateLabyrinth(complexity float64) error {
-	if complexity < 0 || complexity > 1 {
-		return f.Error("Complexity (percentage) cannot be less than 0 or over 1")
-	} else if !f.Start.IsValid(f.Width-1, f.Length-1) || !f.Finish.IsValid(f.Width-1, f.Length-1) {
+	if !f.Start.IsValid(f.Width-1, f.Length-1) || !f.Finish.IsValid(f.Width-1, f.Length-1) {
 		return f.Error("Start and/or finish are out of bounds or not set yet")
 	}
 
-	route_start := Route{Coords: f.Start}
+	route := Route{}
+	route.Init(f.Start)
 	safety_counter := 0
-	const safety_limit = 20
+	const safety_limit = 10
 
-	routes := make([]RouteWithLength, 0, safety_limit)
+	routes := make([]Route, 0, safety_limit)
 
-	for float64(f.CountCells()[Empty])/float64(f.Size()) > 0.5 && safety_counter < safety_limit {
-		route, route_length, failure, err := f.reachFinishOrLoop(route_start)
-		if failure {
+	for float64(f.CountCells()[Empty])/float64(f.Size()) > 0.4 && safety_counter < safety_limit {
+		new_route, err := f.reachFinishOrLoop(route, complexity)
+		if err != nil {
 			return err
 		}
-		routes = append(routes, RouteWithLength{route, route_length})
-		if err != nil {
-			fmt.Println(err)
-		}
-		base_route_info := routes[rand.Intn(len(routes))]
-		base_route_split_idx := rand.Intn(int(base_route_info.l)) //pick random route here from routes
-		new_route := Route{Coords: base_route_info.r.Coords}
-		fmt.Printf("Route n=%v len=%v\n", base_route_split_idx, route_length)
-		// Somewhere after this out of bounds access or nil dereference happened, maybe even in a new iteration
-		ip := base_route_info.r
-		for i := 0; i < base_route_split_idx; i++ {
-			if ip.Next == nil {
-				return f.Error(fmt.Sprintf("Failed to reach random point in route n=%v len=%v", base_route_split_idx, route_length))
-			}
-			ip = *ip.Next
-			new_route.Next = &Route{Coords: ip.Next.Coords}
-			new_route = *new_route.Next
+
+		routes = append(routes, new_route) // TODO: think of a way not to add the same routes twice here
+		for _, r := range routes {
+			fmt.Println(r)
 		}
 
-		route_start = new_route
-		fmt.Println(f)
-		fmt.Printf("New start: %v\n", route_start.Coords)
+		base_route := routes[rand.Intn(len(routes))]
+		base_route_split_idx := rand.Intn(int(base_route.Length)) //pick random route here from routes
+
+		route, err = base_route.CopyUntil(uint(base_route_split_idx))
+		if err != nil {
+			return err
+		}
+
 		safety_counter++
 	}
 
 	if safety_counter == safety_limit {
-		return f.Error("Safety limit exceeded in routes generator")
+		return f.Error("Safety limit exceeded in routes generator") // TODO: make the algorithm run N times until it stops overflowing this counter
 	} else {
 		fmt.Printf("Area filled! \ncells=%v \nempty area=%v\n", f.CountCells(), float32(f.CountCells()[Empty])/float32(f.Size())*100)
 	}
+
+	// TODO: if the labyrinth is generated normally, fill the empty area with walls and remove Paths
 
 	return nil
 }

@@ -30,6 +30,7 @@ func (c Cell) String() string {
 	}
 }
 
+// Check if the cell cannot be a part of the route
 func (c Cell) IsBlocking() bool {
 	return c == Wall || c == Path || c == Start
 }
