@@ -145,23 +145,19 @@ func (f *Field) reachFinishOrLoop(route Route, complexity float64) (Route, error
 	return route, nil
 }
 
-// Generate labyrinth based on complexity (in percents)
-func (f *Field) GenerateLabyrinth(complexity float64) error {
-	if !f.Start.IsValid(f.Width-1, f.Length-1) || !f.Finish.IsValid(f.Width-1, f.Length-1) {
-		return f.Error("Start and/or finish are out of bounds or not set yet")
-	}
-
+// Generate routes for empty labyrinth with defined start and finish cells
+// Generation stops if the labyrinth is filled up to (1-max_empty_area*100%)
+// Will retry the generation 'max_retries' if area is not filled up yet or fail if the 'max_retries' is reached
+func (f *Field) GenerateRoutes(complexity, max_empty_area float64, max_retries uint) (*[]Route, error) {
+	safety_counter := uint(0)
+	routes := make([]Route, 0, max_retries)
 	route := Route{}
 	route.Init(f.Start)
-	safety_counter := 0
-	const safety_limit = 10
 
-	routes := make([]Route, 0, safety_limit)
-
-	for float64(f.CountCells()[Empty])/float64(f.Size()) > 0.4 && safety_counter < safety_limit {
+	for float64(f.CountCells()[Empty])/float64(f.Size()) > 0.4 && safety_counter < max_retries {
 		new_route, err := f.reachFinishOrLoop(route, complexity)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		routes = append(routes, new_route) // TODO: think of a way not to add the same routes twice here
@@ -170,20 +166,51 @@ func (f *Field) GenerateLabyrinth(complexity float64) error {
 		}
 
 		base_route := routes[rand.Intn(len(routes))]
-		base_route_split_idx := rand.Intn(int(base_route.Length)) //pick random route here from routes
+		base_route_split_idx := rand.Intn(int(base_route.Length)) // pick random route here from 'routes'
 
 		route, err = base_route.CopyUntil(uint(base_route_split_idx))
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		safety_counter++
 	}
 
-	if safety_counter == safety_limit {
-		return f.Error("Safety limit exceeded in routes generator") // TODO: make the algorithm run N times until it stops overflowing this counter
+	if safety_counter == max_retries {
+		fmt.Println("Safety limit exceeded in routes generator")
+		return nil, nil
 	} else {
 		fmt.Printf("Area filled! \ncells=%v \nempty area=%v\n", f.CountCells(), float32(f.CountCells()[Empty])/float32(f.Size())*100)
+	}
+
+	return &routes, nil
+}
+
+// Generate labyrinth based on complexity (in percents)
+func (f *Field) GenerateLabyrinth(complexity float64) error {
+	if !f.Start.IsValid(f.Width-1, f.Length-1) || !f.Finish.IsValid(f.Width-1, f.Length-1) {
+		return f.Error("Start and/or finish are out of bounds or not set yet")
+	}
+
+	const safety_limit, min_area, route_retries = 3, 0.4, 10
+	safety_counter := 0
+
+	routes, err := f.GenerateRoutes(complexity, min_area, route_retries)
+	for ; routes == nil && safety_counter < safety_limit; safety_counter++ {
+		if err != nil {
+			return err
+		}
+		f.MakeEmpty(true)
+		routes, err = f.GenerateRoutes(complexity, min_area, route_retries)
+	}
+
+	if safety_counter == safety_limit {
+		return f.Error("Safety limit exceeded in labyrinth generator")
+	}
+
+	fmt.Println("Winning routes:")
+	for _, r := range *routes {
+		fmt.Println(r)
 	}
 
 	// TODO: if the labyrinth is generated normally, fill the empty area with walls and remove Paths

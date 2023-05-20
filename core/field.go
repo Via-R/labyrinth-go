@@ -21,17 +21,22 @@ func (f *Field) SetSize(width, length uint) {
 		f.labyrinth[i] = make([]Cell, width)
 	}
 	f.Width, f.Length = width, length
-	f.MakeEmpty()
+	f.MakeEmpty(false)
 }
 
-// Clear up all cells
-func (f *Field) MakeEmpty() {
+// Clear up all cells except for start and finish if the flag is true
+func (f *Field) MakeEmpty(leave_start_and_finish bool) {
 	for i := range f.labyrinth {
 		for j := range f.labyrinth[i] {
 			f.labyrinth[i][j] = Empty
 		}
 	}
-	f.Start, f.Finish = Coordinates{-1, -1}, Coordinates{-1, -1}
+	if leave_start_and_finish {
+		f.labyrinth[f.Start.Y][f.Start.X] = Start
+		f.labyrinth[f.Finish.Y][f.Finish.X] = Finish
+	} else {
+		f.Start, f.Finish = Coordinates{-1, -1}, Coordinates{-1, -1}
+	}
 }
 
 // Get cell type at given coordinates
