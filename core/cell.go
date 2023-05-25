@@ -31,8 +31,8 @@ func (c Cell) String() string {
 }
 
 // Check if the cell cannot be a part of the route
-func (c Cell) IsBlocking() bool {
-	return c == Wall || c == Path || c == Start
+func (c Cell) IsBlocking(finish_is_blocking bool) bool {
+	return c == Wall || c == Path || c == Start || c == Finish && finish_is_blocking
 }
 
 // Create a string representation of a labyrinth row

@@ -100,3 +100,19 @@ func (f *Field) CountCells() map[Cell]uint {
 func (f *Field) Size() uint {
 	return f.Width * f.Length
 }
+
+// Replace paths with empty cells and fill the rest with walls
+func (f *Field) fillEmptyCellsWithWalls() {
+	for i := range f.labyrinth {
+		for j := range f.labyrinth[i] {
+			coords := Coordinates{X: j, Y: i}
+			if cell, err := f.at(coords); err != nil {
+				continue
+			} else if !cell.IsBlocking(true) {
+				f.set(Wall, coords)
+			} else if cell == Path {
+				f.set(Empty, coords)
+			}
+		}
+	}
+}
