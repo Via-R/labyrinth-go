@@ -6,19 +6,20 @@ import (
 
 // Linked list to represent a route
 type Route struct {
-	Start, End *RouteStep
-	Length     uint
+	Start, End  *routeStep
+	Length      uint
+	BaseIndices []uint
 }
 
 // Linked list node
-type RouteStep struct {
+type routeStep struct {
 	Coords Coordinates
-	Next   *RouteStep
-	Prev   *RouteStep
+	Next   *routeStep
+	Prev   *routeStep
 }
 
 // String representation of one route step
-func (r RouteStep) String() string {
+func (r routeStep) String() string {
 	return fmt.Sprintf("Step %v, next=%p, prev=%p", r.Coords, r.Next, r.Prev)
 }
 
@@ -33,18 +34,18 @@ func (r *Route) Init(c Coordinates) error {
 		return r.Error("Route.Init can only be called once, some of the fields were already initialized")
 	}
 
-	new_node := RouteStep{Coords: c, Next: nil, Prev: nil}
+	new_node := routeStep{Coords: c, Next: nil, Prev: nil}
 	r.Start, r.End, r.Length = &new_node, &new_node, 1
 
 	return nil
 }
 
-// Add a new RouteStep to the route
+// Add a new routeStep to the route
 func (r *Route) Add(c Coordinates) error {
 	if r.Start == nil || r.End == nil || r.Length == 0 {
 		return r.Error("Route.Init needs to be called first, none of the fields were initialized")
 	}
-	new_node := RouteStep{Coords: c, Next: nil, Prev: r.End}
+	new_node := routeStep{Coords: c, Next: nil, Prev: r.End}
 	r.End.Next = &new_node
 	r.End = &new_node
 	r.Length++

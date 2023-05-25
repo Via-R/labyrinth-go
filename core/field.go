@@ -10,7 +10,7 @@ type Field struct {
 	labyrinth     [][]Cell
 	Width, Length uint
 	Start, Finish Coordinates
-	Solution      RouteStep
+	Solution      Route
 }
 
 // Change the size of labyrinth

@@ -145,10 +145,39 @@ func (f *Field) reachFinishOrLoop(route Route, complexity float64) (Route, error
 	return route, nil
 }
 
+// Go through all provided routes and update their BaseIndices field
+func (f *Field) processRoutesForBaseCompatibility(routes *[]Route) {
+	for route_idx, route := range *routes {
+		it := route.GetIterator()
+		base_indices := make([]uint, 0, route.Length)
+		route_part_idx := uint(0)
+		for coords, is_end := it(); !is_end; coords, is_end = it() {
+			if options, err := f.findChoices(coords); err == nil && len(options) > 0 {
+				// NOTE: here we might want to not count finish as an option as we might not want to start a new path there
+				base_indices = append(base_indices, route_part_idx)
+			}
+			route_part_idx++
+		}
+		(*routes)[route_idx].BaseIndices = base_indices
+	}
+}
+
+// Remove routes that do not have possible bases for new routes
+func (f *Field) removeNonBaseRoutes(routes *[]Route) {
+	idx := 0
+	for _, route := range *routes {
+		if len(route.BaseIndices) > 0 {
+			(*routes)[idx] = route
+			idx++
+		}
+	}
+	*routes = (*routes)[:idx]
+}
+
 // Generate routes for empty labyrinth with defined start and finish cells
 // Generation stops if the labyrinth is filled up to (1-max_empty_area*100%)
 // Will retry the generation 'max_retries' if area is not filled up yet or fail if the 'max_retries' is reached
-func (f *Field) GenerateRoutes(complexity, max_empty_area float64, max_retries uint) (*[]Route, error) {
+func (f *Field) GenerateRoutes(complexity, max_empty_area float64, max_retries uint) error {
 	safety_counter := uint(0)
 	routes := make([]Route, 0, max_retries)
 	route := Route{}
@@ -157,20 +186,31 @@ func (f *Field) GenerateRoutes(complexity, max_empty_area float64, max_retries u
 	for float64(f.CountCells()[Empty])/float64(f.Size()) > 0.4 && safety_counter < max_retries {
 		new_route, err := f.reachFinishOrLoop(route, complexity)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
-		routes = append(routes, new_route) // TODO: think of a way not to add the same routes twice here
-		for _, r := range routes {
-			fmt.Println(r)
+		routes = append(routes, new_route)
+		// update BaseIndices for all routes to show which route parts can be bases for new routes
+		f.processRoutesForBaseCompatibility(&routes)
+		// remove routes that cannot provide any new routes
+		f.removeNonBaseRoutes(&routes)
+
+		// TODO: I think this can be done only in loop condition, maybe it's possible to round-robin functionality to do this
+		if float64(f.CountCells()[Empty])/float64(f.Size()) < 0.4 {
+			break
+		} else if len(routes) == 0 {
+			return f.Error("Cannot form new routes but area is not filled yet")
 		}
 
+		// pick one of the routes
 		base_route := routes[rand.Intn(len(routes))]
-		base_route_split_idx := rand.Intn(int(base_route.Length)) // pick random route here from 'routes'
 
-		route, err = base_route.CopyUntil(uint(base_route_split_idx))
+		// create a copy until one of the possible bases and kick off a new route
+		base_route_split_idx := base_route.BaseIndices[rand.Intn(len(base_route.BaseIndices))] // pick random route that has possible bases
+		route, err = base_route.CopyUntil(uint(base_route_split_idx) + 1)
+
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		safety_counter++
@@ -178,12 +218,11 @@ func (f *Field) GenerateRoutes(complexity, max_empty_area float64, max_retries u
 
 	if safety_counter == max_retries {
 		fmt.Println("Safety limit exceeded in routes generator")
-		return nil, nil
 	} else {
 		fmt.Printf("Area filled! \ncells=%v \nempty area=%v\n", f.CountCells(), float32(f.CountCells()[Empty])/float32(f.Size())*100)
 	}
 
-	return &routes, nil
+	return nil
 }
 
 // Generate labyrinth based on complexity (in percents)
@@ -192,25 +231,17 @@ func (f *Field) GenerateLabyrinth(complexity float64) error {
 		return f.Error("Start and/or finish are out of bounds or not set yet")
 	}
 
-	const safety_limit, min_area, route_retries = 3, 0.4, 10
-	safety_counter := 0
+	const safety_limit, min_area, route_retries = 1, 0.4, 12
 
-	routes, err := f.GenerateRoutes(complexity, min_area, route_retries)
-	for ; routes == nil && safety_counter < safety_limit; safety_counter++ {
-		if err != nil {
-			return err
-		}
+	err := f.GenerateRoutes(complexity, min_area, route_retries)
+	safety_counter := 0
+	for ; err != nil && safety_counter < safety_limit; safety_counter++ {
 		f.MakeEmpty(true)
-		routes, err = f.GenerateRoutes(complexity, min_area, route_retries)
+		err = f.GenerateRoutes(complexity, min_area, route_retries)
 	}
 
 	if safety_counter == safety_limit {
 		return f.Error("Safety limit exceeded in labyrinth generator")
-	}
-
-	fmt.Println("Winning routes:")
-	for _, r := range *routes {
-		fmt.Println(r)
 	}
 
 	// TODO: if the labyrinth is generated normally, fill the empty area with walls and remove Paths
