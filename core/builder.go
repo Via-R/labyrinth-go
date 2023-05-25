@@ -22,35 +22,11 @@ func (f *Field) countWallsAround(coords Coordinates, finish_reached bool) uint {
 	return counter
 }
 
-// Check that the Moore's neighborhood of the cell at the chosen coordinates doesn't have any corners made of 3 blocking cells
+// Check that the cell can be a part of the route with one of the available ChoiceChecker's
 func (f *Field) isChoiceValid(coords Coordinates, finish_reached bool) bool {
-	thirds_counter := 0
-	corner_dots_counter := 0
-	loopedMooreShifts := append(MooreShifts[:], MooreShifts[0])
-	for i := 0; i < len(loopedMooreShifts); i++ {
-		thirds_counter++
-		shift := loopedMooreShifts[i]
-		choice := Coordinates{coords.X + shift[0], coords.Y + shift[1]}
-		cell, err := f.at(choice)
+	checker := isChoiceValidByNBlocksGetter(3)
 
-		if err == nil && finish_reached && cell == Finish {
-			// if we want only one path near finish, we eliminate choices that are in moore's neighborhood with 'Finish' cell
-			return false
-		}
-		if err == nil && cell.IsBlocking(finish_reached) {
-			corner_dots_counter++
-		}
-		if corner_dots_counter == 3 {
-			return false
-		}
-		if thirds_counter == 3 {
-			thirds_counter = 0
-			corner_dots_counter = 0
-			i--
-		}
-	}
-
-	return true
+	return checker(f, coords, finish_reached)
 }
 
 // Find all possible choices from given coordinates
@@ -191,13 +167,14 @@ func (f *Field) GenerateRoutes(complexity, max_empty_area float64, max_retries u
 	routes[0].Init(f.Start)
 	finish_reached := false
 
-	for float64(f.CountCells()[Empty])/float64(f.Size()) > 0.4 && safety_counter < max_retries {
+	for float64(f.CountCells()[Empty])/float64(f.Size()) > max_empty_area && safety_counter < max_retries {
 		// update BaseIndices for all routes to show which route parts can be bases for new routes
 		f.processRoutesForBaseCompatibility(&routes, finish_reached)
 		// remove routes that cannot provide any new routes
 		f.removeNonBaseRoutes(&routes)
 
 		if len(routes) == 0 {
+			fmt.Println(float64(f.CountCells()[Empty]) / float64(f.Size()))
 			return f.Error("Cannot form new routes but area is not filled yet")
 		}
 
@@ -242,7 +219,7 @@ func (f *Field) GenerateLabyrinth(complexity float64, only_one_path_near_finish 
 		return f.Error("Start and/or finish are out of bounds or not set yet")
 	}
 
-	const safety_limit, min_area = 1, 0.25
+	const safety_limit, min_area = 10, 0.4
 	route_retries := f.Size()
 
 	err := f.GenerateRoutes(complexity, min_area, route_retries, only_one_path_near_finish)
@@ -252,6 +229,7 @@ func (f *Field) GenerateLabyrinth(complexity float64, only_one_path_near_finish 
 		err = f.GenerateRoutes(complexity, min_area, route_retries, only_one_path_near_finish)
 	}
 
+	fmt.Println(err)
 	if safety_counter == safety_limit {
 		return f.Error("Safety limit exceeded in labyrinth generator")
 	}
