@@ -58,3 +58,33 @@ func isChoiceValidByNBlocksGetter(max_blocks_around uint) ChoiceChecker {
 		return true
 	}
 }
+
+// Check that the route either goes straight or turns but never goes in the vicinity of other routes, including itself
+func isChoiceValidBy2CloseBlocksGetter() ChoiceChecker {
+	return func(f *Field, coords Coordinates, finish_reached bool) bool {
+		blocks_around := 0
+		var first_block *Coordinates = nil
+		for _, shift := range MooreShifts {
+			choice := Coordinates{coords.X + shift[0], coords.Y + shift[1]}
+			cell, err := f.at(choice)
+
+			if err == nil && finish_reached && cell == Finish {
+				// if we want only one path near finish, we eliminate choices that are in moore's neighborhood with 'Finish' cell
+				return false
+			}
+			if err == nil && cell.IsBlocking(finish_reached) {
+				if first_block == nil {
+					first_block = &choice
+				} else if first_block.Distance(choice) > 1 {
+					return false
+				}
+				blocks_around++
+			}
+			if blocks_around > 2 {
+				return false
+			}
+		}
+
+		return true
+	}
+}

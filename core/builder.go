@@ -24,7 +24,7 @@ func (f *Field) countWallsAround(coords Coordinates, finish_reached bool) uint {
 
 // Check that the cell can be a part of the route with one of the available ChoiceChecker's
 func (f *Field) isChoiceValid(coords Coordinates, finish_reached bool) bool {
-	checker := isChoiceValidByNBlocksGetter(3)
+	checker := isChoiceValidBy2CloseBlocksGetter()
 
 	return checker(f, coords, finish_reached)
 }
@@ -219,7 +219,7 @@ func (f *Field) GenerateLabyrinth(complexity float64, only_one_path_near_finish 
 		return f.Error("Start and/or finish are out of bounds or not set yet")
 	}
 
-	const safety_limit, min_area = 10, 0.4
+	const safety_limit, min_area = 10, 0.5
 	route_retries := f.Size()
 
 	err := f.GenerateRoutes(complexity, min_area, route_retries, only_one_path_near_finish)
