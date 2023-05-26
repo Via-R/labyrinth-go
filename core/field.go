@@ -13,6 +13,55 @@ type Field struct {
 	Configuration *configuration
 }
 
+// Return serialized labyrinth data
+func (f *Field) GetLabyrinth() [][]uint {
+	serialized_data := make([][]uint, f.Length)
+	for row_idx, row := range f.labyrinth {
+		serialized_data[row_idx] = make([]uint, f.Width)
+		for cell_idx, cell := range row {
+			serialized_data[row_idx][cell_idx] = uint(cell)
+		}
+	}
+
+	return serialized_data
+}
+
+// Load labyrinth from input data
+func (f *Field) LoadLabyrinth(l [][]uint) error {
+	if len(l) == 0 {
+		return f.Error("Cannot load empty array as a labyrinth")
+	}
+	width, length := len(l[0]), len(l)
+	labyrinth := make([][]cell, len(l))
+	var start, finish *Coordinates
+	for row_idx, row := range l {
+		if len(row) != width {
+			return f.Error(fmt.Sprintf("Array should be rectangular, first row had %v elements, and row #%v has %v", width, row_idx, len(row)))
+		}
+		labyrinth[row_idx] = make([]cell, width)
+		for cell_idx, cell_data := range row {
+			if cell(cell_data) >= Unknown {
+				return f.Error(fmt.Sprintf("Cannot use %v as a cell value", cell_data))
+			}
+			new_cell := cell(cell_data)
+			labyrinth[row_idx][cell_idx] = new_cell
+			switch new_cell {
+			case Start:
+				start = &Coordinates{X: cell_idx, Y: row_idx}
+			case Finish:
+				finish = &Coordinates{X: cell_idx, Y: row_idx}
+			}
+		}
+	}
+	if start == nil || finish == nil {
+		return f.Error("No start and/or finish in the data")
+	}
+
+	f.Width, f.Length, f.labyrinth, f.Start, f.Finish = uint(width), uint(length), labyrinth, *start, *finish
+
+	return nil
+}
+
 // Set up configuration values from .toml file
 func (f *Field) Init(filename string) error {
 	var config configuration
@@ -80,13 +129,13 @@ func (f *Field) SetStartAndFinish(start, finish Coordinates) {
 
 // String representation of the entire labyrinth and its data
 func (f Field) String() string {
-	field_string := "\n"
+	field_string := fmt.Sprintf("Size: %vx%v\nStart: %v\nFinish: %v\n\n", f.Width, f.Length, f.Start, f.Finish)
 
 	for i := len(f.labyrinth) - 1; i >= 0; i-- {
 		field_string += cellsArrayToString(f.labyrinth[i], " ") + "\n"
 	}
 
-	return field_string
+	return field_string[:len(field_string)-1]
 }
 
 // Formatted error for usage in Field

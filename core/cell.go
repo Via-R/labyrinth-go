@@ -10,6 +10,7 @@ const (
 	Start
 	Finish
 	Path
+	Unknown // should always be last for type validation
 )
 
 // String representation of a singular Cell
