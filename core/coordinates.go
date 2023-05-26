@@ -20,6 +20,7 @@ func (c Coordinates) Distance(dest Coordinates) float64 {
 	return math.Sqrt(math.Pow(float64(dest.X)-float64(c.X), 2) + math.Pow(float64(dest.Y)-float64(c.Y), 2))
 }
 
+// String representation of coordinates struct
 func (c Coordinates) String() string {
 	return string(fmt.Sprintf("{%v, %v}", c.X, c.Y))
 }

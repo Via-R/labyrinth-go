@@ -9,8 +9,8 @@ import (
 type Field struct {
 	labyrinth     [][]cell
 	Width, Length uint
-	start, finish Coordinates
-	configuration *configuration
+	Start, Finish Coordinates
+	Configuration *configuration
 }
 
 // Set up configuration values from .toml file
@@ -19,7 +19,7 @@ func (f *Field) Init(filename string) error {
 	if err := config.LoadFromFile(filename); err != nil {
 		return err
 	}
-	f.configuration = &config
+	f.Configuration = &config
 
 	return nil
 }
@@ -43,15 +43,15 @@ func (f *Field) MakeEmpty(leave_start_and_finish bool) {
 		}
 	}
 	if leave_start_and_finish {
-		f.labyrinth[f.start.Y][f.start.X] = Start
-		f.labyrinth[f.finish.Y][f.finish.X] = Finish
+		f.labyrinth[f.Start.Y][f.Start.X] = Start
+		f.labyrinth[f.Finish.Y][f.Finish.X] = Finish
 	} else {
-		f.start, f.finish = Coordinates{-1, -1}, Coordinates{-1, -1}
+		f.Start, f.Finish = Coordinates{-1, -1}, Coordinates{-1, -1}
 	}
 }
 
 // Get cell type at given coordinates
-func (f *Field) at(c Coordinates) (cell, error) {
+func (f *Field) At(c Coordinates) (cell, error) {
 	if !c.IsValid(f.Width-1, f.Length-1) {
 		return Empty, f.Error(fmt.Sprintf("Cannot get cell %v out of field's bounds w=%v l=%v", c, f.Width, f.Length))
 	}
@@ -60,11 +60,11 @@ func (f *Field) at(c Coordinates) (cell, error) {
 }
 
 // Change cell type at the chosen coordinates
-func (f *Field) set(new_cell cell, c Coordinates) error {
+func (f *Field) Set(new_cell cell, c Coordinates) error {
 	if !c.IsValid(f.Width-1, f.Length-1) {
 		return f.Error(fmt.Sprintf("Cannot set cell %v out of field's bounds w=%v l=%v", c, f.Width, f.Length))
 	}
-	if old_cell, _ := f.at(c); old_cell != Start && old_cell != Finish {
+	if old_cell, _ := f.At(c); old_cell != Start && old_cell != Finish {
 		f.labyrinth[c.Y][c.X] = new_cell
 	}
 
@@ -75,7 +75,7 @@ func (f *Field) set(new_cell cell, c Coordinates) error {
 func (f *Field) SetStartAndFinish(start, finish Coordinates) {
 	f.labyrinth[start.Y][start.X] = Start
 	f.labyrinth[finish.Y][finish.X] = Finish
-	f.start, f.finish = start, finish
+	f.Start, f.Finish = start, finish
 }
 
 // String representation of the entire labyrinth and its data
@@ -113,16 +113,16 @@ func (f *Field) Size() uint {
 }
 
 // Replace paths with empty cells and fill the rest with walls
-func (f *Field) fillEmptyCellsWithWalls() {
+func (f *Field) FillEmptyCellsWithWalls() {
 	for i := range f.labyrinth {
 		for j := range f.labyrinth[i] {
 			coords := Coordinates{X: j, Y: i}
-			if cell, err := f.at(coords); err != nil {
+			if cell, err := f.At(coords); err != nil {
 				continue
 			} else if !cell.IsBlocking(true) {
-				f.set(Wall, coords)
+				f.Set(Wall, coords)
 			} else if cell == Path {
-				f.set(Empty, coords)
+				f.Set(Empty, coords)
 			}
 		}
 	}
