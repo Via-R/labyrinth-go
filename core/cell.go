@@ -1,11 +1,11 @@
 package core
 
 // Value to represent what is placed in the labyrinth
-type Cell uint
+type cell uint
 
 // Enum for possible things placed in a cell
 const (
-	Empty Cell = iota
+	Empty cell = iota
 	Wall
 	Start
 	Finish
@@ -13,7 +13,7 @@ const (
 )
 
 // String representation of a singular Cell
-func (c Cell) String() string {
+func (c cell) String() string {
 	switch c {
 	case Empty:
 		return "∘"
@@ -31,12 +31,12 @@ func (c Cell) String() string {
 }
 
 // Check if the cell cannot be a part of the route
-func (c Cell) IsBlocking(finish_is_blocking bool) bool {
+func (c cell) IsBlocking(finish_is_blocking bool) bool {
 	return c == Wall || c == Path || c == Start || c == Finish && finish_is_blocking
 }
 
 // Create a string representation of a labyrinth row
-func cellsArrayToString(cells []Cell, delimeter string) string {
+func cellsArrayToString(cells []cell, delimeter string) string {
 	row_string := ""
 	for _, cell := range cells {
 		row_string += " " + cell.String()

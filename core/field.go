@@ -7,20 +7,19 @@ import (
 
 // Container for labyrinth and additional characteristics
 type Field struct {
-	labyrinth     [][]Cell
+	labyrinth     [][]cell
 	Width, Length uint
-	Start, Finish Coordinates
-	Solution      Route
-	Configuration *Configuration
+	start, finish Coordinates
+	configuration *configuration
 }
 
 // Set up configuration values from .toml file
 func (f *Field) Init(filename string) error {
-	var config Configuration
+	var config configuration
 	if err := config.LoadFromFile(filename); err != nil {
 		return err
 	}
-	f.Configuration = &config
+	f.configuration = &config
 
 	return nil
 }
@@ -28,9 +27,9 @@ func (f *Field) Init(filename string) error {
 // Change the size of labyrinth
 // Clears up all cells
 func (f *Field) SetSize(width, length uint) {
-	f.labyrinth = make([][]Cell, length)
+	f.labyrinth = make([][]cell, length)
 	for i := range f.labyrinth {
-		f.labyrinth[i] = make([]Cell, width)
+		f.labyrinth[i] = make([]cell, width)
 	}
 	f.Width, f.Length = width, length
 	f.MakeEmpty(false)
@@ -44,15 +43,15 @@ func (f *Field) MakeEmpty(leave_start_and_finish bool) {
 		}
 	}
 	if leave_start_and_finish {
-		f.labyrinth[f.Start.Y][f.Start.X] = Start
-		f.labyrinth[f.Finish.Y][f.Finish.X] = Finish
+		f.labyrinth[f.start.Y][f.start.X] = Start
+		f.labyrinth[f.finish.Y][f.finish.X] = Finish
 	} else {
-		f.Start, f.Finish = Coordinates{-1, -1}, Coordinates{-1, -1}
+		f.start, f.finish = Coordinates{-1, -1}, Coordinates{-1, -1}
 	}
 }
 
 // Get cell type at given coordinates
-func (f *Field) at(c Coordinates) (Cell, error) {
+func (f *Field) at(c Coordinates) (cell, error) {
 	if !c.IsValid(f.Width-1, f.Length-1) {
 		return Empty, f.Error(fmt.Sprintf("Cannot get cell %v out of field's bounds w=%v l=%v", c, f.Width, f.Length))
 	}
@@ -61,12 +60,12 @@ func (f *Field) at(c Coordinates) (Cell, error) {
 }
 
 // Change cell type at the chosen coordinates
-func (f *Field) set(cell Cell, c Coordinates) error {
+func (f *Field) set(new_cell cell, c Coordinates) error {
 	if !c.IsValid(f.Width-1, f.Length-1) {
 		return f.Error(fmt.Sprintf("Cannot set cell %v out of field's bounds w=%v l=%v", c, f.Width, f.Length))
 	}
 	if old_cell, _ := f.at(c); old_cell != Start && old_cell != Finish {
-		f.labyrinth[c.Y][c.X] = cell
+		f.labyrinth[c.Y][c.X] = new_cell
 	}
 
 	return nil
@@ -76,7 +75,7 @@ func (f *Field) set(cell Cell, c Coordinates) error {
 func (f *Field) SetStartAndFinish(start, finish Coordinates) {
 	f.labyrinth[start.Y][start.X] = Start
 	f.labyrinth[finish.Y][finish.X] = Finish
-	f.Start, f.Finish = start, finish
+	f.start, f.finish = start, finish
 }
 
 // String representation of the entire labyrinth and its data
@@ -96,8 +95,8 @@ func (Field) Error(s string) error {
 }
 
 // Count all cell types in the labyrinth
-func (f *Field) CountCells() map[Cell]uint {
-	counter := make(map[Cell]uint)
+func (f *Field) CountCells() map[cell]uint {
+	counter := make(map[cell]uint)
 
 	for _, row := range f.labyrinth {
 		for _, cell := range row {

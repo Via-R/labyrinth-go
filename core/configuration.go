@@ -2,30 +2,31 @@ package core
 
 import (
 	"fmt"
-	toml "github.com/BurntSushi/toml"
 	"os"
+
+	toml "github.com/BurntSushi/toml"
 )
 
-// Configuration structure
+// configuration structure
 type (
-	Builder struct {
+	builder struct {
 		Complexity              float64 `toml:"complexity"`
 		MaxAreaToCoverWithWalls float64 `toml:"max_area_to_cover_with_walls"`
 		OnlyOnePathNearFinish   bool    `toml:"only_one_path_near_finish"`
 		LabyrinthBuilderAtempts uint    `toml:"labyrinth_builder_atempts"`
 	}
-	Configuration struct {
-		Builder Builder `toml:"builder"`
+	configuration struct {
+		Builder builder `toml:"builder"`
 	}
 )
 
 // Custom error for Configuration
-func (Configuration) Error(s string) error {
+func (configuration) Error(s string) error {
 	return fmt.Errorf("Configuration error: %v", s)
 }
 
 // Validate configuration values
-func (c *Configuration) validate() error {
+func (c *configuration) validate() error {
 	if c.Builder.Complexity < 0 || c.Builder.Complexity > 100 {
 		return c.Error("Complexity (percentage) cannot be less than 0 or over 100")
 	}
@@ -37,7 +38,7 @@ func (c *Configuration) validate() error {
 }
 
 // Load configuration values from TOML file under 'filename'
-func (c *Configuration) LoadFromFile(filename string) error {
+func (c *configuration) LoadFromFile(filename string) error {
 	if blob, err := os.ReadFile(filename); err != nil {
 		return err
 	} else if _, err := toml.Decode(string(blob), c); err != nil {
