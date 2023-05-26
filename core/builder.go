@@ -47,13 +47,10 @@ func (f *Field) findChoices(coords Coordinates, finish_reached bool) ([]Coordina
 // Select one of the choices based on distance to finish
 // Choices are made based on probability, which is proportionate to the distance to finish
 // Probabilities are flipped if complexity is high enough
-func (f *Field) selectChoice(choices []Coordinates, complexity float64) (Coordinates, error) {
-	if complexity < 0 || complexity > 1 {
-		return Coordinates{-1, -1}, f.Error("Complexity (percentage) cannot be less than 0 or over 1")
-	}
+func (f *Field) selectChoice(choices []Coordinates) (Coordinates, error) {
 	switch len(choices) {
 	case 0:
-		return Coordinates{-1, -1}, nil
+		return Coordinates{-1, -1}, f.Error("Cannot make a choice out of zero length array")
 	case 1:
 		return choices[0], nil
 	}
@@ -66,7 +63,7 @@ func (f *Field) selectChoice(choices []Coordinates, complexity float64) (Coordin
 
 	distances, probabilities, probability_limits := make([]float64, len(choices)), make([]float64, len(choices)), make([]float64, len(choices))
 	sum := 0.
-	reverse_distances := rand.Float64() < complexity
+	reverse_distances := rand.Float64()*100 < f.Configuration.Builder.Complexity
 	for i := range choices {
 		distances[i] = 1 / choices[i].Distance(f.Finish)
 		if reverse_distances {
@@ -98,7 +95,7 @@ func (f *Field) selectChoice(choices []Coordinates, complexity float64) (Coordin
 }
 
 // Continue the given route until it gets stuck or reaches the finish
-func (f *Field) reachFinishOrLoop(route Route, complexity float64, finish_reached bool) (Route, error) {
+func (f *Field) reachFinishOrLoop(route Route, finish_reached bool) (Route, error) {
 	safety_counter := 0
 	const safety_limit = 10000
 
@@ -112,7 +109,7 @@ func (f *Field) reachFinishOrLoop(route Route, complexity float64, finish_reache
 			return route, nil
 		}
 
-		next_coords, err := f.selectChoice(choices, complexity)
+		next_coords, err := f.selectChoice(choices)
 		if err = f.set(Path, next_coords); err != nil {
 			return Route{}, err
 		}
@@ -157,17 +154,15 @@ func (f *Field) removeNonBaseRoutes(routes *[]Route) {
 }
 
 // Generate routes for empty labyrinth with defined start and finish cells
-// Generation stops if the labyrinth is filled up to (1-max_empty_area*100%)
-// Will retry the generation 'max_retries' if area is not filled up yet or fail if the 'max_retries' is reached,
-// if 'only_one_path_near_finish' is true, then only one path cell can be around finish
-func (f *Field) GenerateRoutes(complexity, max_empty_area float64, max_retries uint, only_one_path_near_finish bool) error {
+func (f *Field) GenerateRoutes() error {
 	safety_counter := uint(0)
-	routes := make([]Route, 1, max_retries)
+	max_route_builds := f.Size()
+	routes := make([]Route, 1, max_route_builds)
 	routes[0] = Route{}
 	routes[0].Init(f.Start)
 	finish_reached := false
 
-	for float64(f.CountCells()[Empty])/float64(f.Size()) > max_empty_area && safety_counter < max_retries {
+	for float64(f.CountCells()[Empty])/float64(f.Size())*100 > f.Configuration.Builder.MaxAreaToCoverWithWalls && safety_counter < max_route_builds {
 		// update BaseIndices for all routes to show which route parts can be bases for new routes
 		f.processRoutesForBaseCompatibility(&routes, finish_reached)
 		// remove routes that cannot provide any new routes
@@ -188,13 +183,13 @@ func (f *Field) GenerateRoutes(complexity, max_empty_area float64, max_retries u
 			return err
 		}
 
-		new_route, err := f.reachFinishOrLoop(new_route_base, complexity, finish_reached)
+		new_route, err := f.reachFinishOrLoop(new_route_base, finish_reached)
 		if err != nil {
 			return err
 		}
 		if end_cell, err := f.at(new_route.End.Coords); err != nil {
 			return err
-		} else if only_one_path_near_finish && end_cell == Finish {
+		} else if f.Configuration.Builder.OnlyOnePathNearFinish && end_cell == Finish {
 			finish_reached = true
 		}
 
@@ -204,7 +199,7 @@ func (f *Field) GenerateRoutes(complexity, max_empty_area float64, max_retries u
 	if !finish_reached {
 		return f.Error("Area filled but finish was not reached")
 	}
-	if safety_counter == max_retries {
+	if safety_counter == max_route_builds {
 		fmt.Println("Safety limit exceeded in routes generator")
 	} else {
 		fmt.Printf("Area filled! \ncells=%v \nempty area=%v\n", f.CountCells(), float32(f.CountCells()[Empty])/float32(f.Size())*100)
@@ -213,24 +208,24 @@ func (f *Field) GenerateRoutes(complexity, max_empty_area float64, max_retries u
 	return nil
 }
 
-// Generate labyrinth based on complexity (in percents)
-func (f *Field) GenerateLabyrinth(complexity float64, only_one_path_near_finish bool) error {
+// Generate labyrinth based on configuration parameters
+func (f *Field) GenerateLabyrinth() error {
+	if f.Configuration == nil {
+		return f.Error("Configuration was not initialized yet")
+	}
 	if !f.Start.IsValid(f.Width-1, f.Length-1) || !f.Finish.IsValid(f.Width-1, f.Length-1) {
 		return f.Error("Start and/or finish are out of bounds or not set yet")
 	}
 
-	const safety_limit, min_area = 10, 0.5
-	route_retries := f.Size()
-
-	err := f.GenerateRoutes(complexity, min_area, route_retries, only_one_path_near_finish)
-	safety_counter := 0
-	for ; err != nil && safety_counter < safety_limit; safety_counter++ {
+	err := f.GenerateRoutes()
+	safety_counter := uint(0)
+	for ; err != nil && safety_counter < f.Configuration.Builder.LabyrinthBuilderAtempts; safety_counter++ {
 		f.MakeEmpty(true)
-		err = f.GenerateRoutes(complexity, min_area, route_retries, only_one_path_near_finish)
+		err = f.GenerateRoutes()
 	}
 
 	fmt.Println(err)
-	if safety_counter == safety_limit {
+	if safety_counter == f.Configuration.Builder.LabyrinthBuilderAtempts {
 		return f.Error("Safety limit exceeded in labyrinth generator")
 	}
 

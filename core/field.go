@@ -11,6 +11,18 @@ type Field struct {
 	Width, Length uint
 	Start, Finish Coordinates
 	Solution      Route
+	Configuration *Configuration
+}
+
+// Set up configuration values from .toml file
+func (f *Field) Init(filename string) error {
+	var config Configuration
+	if err := config.LoadFromFile(filename); err != nil {
+		return err
+	}
+	f.Configuration = &config
+
+	return nil
 }
 
 // Change the size of labyrinth

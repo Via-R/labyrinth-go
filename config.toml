@@ -1,0 +1,7 @@
+# Configuration for labyrinth builder
+
+[builder]
+complexity = 100 # Percentage of how complex the routes should be, lower percentage will lead to simpler solutions
+only_one_path_near_finish = true # Flag to decide whether there should be only one path in the vicinity of the finish cell
+labyrinth_builder_atempts = 10 # The amount of attmepts to build a labyrinth (fill the area properly according to the parameters)
+max_area_to_cover_with_walls = 50 # Generation stops if the labyrinth has less than this percentage of walls

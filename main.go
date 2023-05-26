@@ -7,12 +7,14 @@ import (
 
 func main() {
 	fmt.Println("Labyrinth sandbox")
-	l := core.Field{}
+	var l core.Field
+	if err := l.Init("config.toml"); err != nil {
+		panic(err)
+	}
 	l.SetSize(16, 16)
 	l.SetStartAndFinish(core.Coordinates{X: 0, Y: 4}, core.Coordinates{X: 15, Y: 3})
-	err := l.GenerateLabyrinth(1, true)
-	if err != nil {
-		fmt.Println(err)
+	if err := l.GenerateLabyrinth(); err != nil {
+		panic(err)
 	}
 	fmt.Println(l)
 }
